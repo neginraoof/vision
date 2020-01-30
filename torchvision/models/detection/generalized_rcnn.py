@@ -66,19 +66,21 @@ class GeneralizedRCNN(nn.Module):
         images, targets = self.transform(images, targets)
         features = self.backbone(images.tensors)
         if isinstance(features, torch.Tensor):
-            features = OrderedDict([('0', features)])
+            features = OrderedDict([('0', torch.rand(1, 256, 304, 200))])
+        # print("size of features=========== ", features['0'].size())
         proposals, proposal_losses = self.rpn(images, features, targets)
         detections, detector_losses = self.roi_heads(features, proposals, images.image_sizes, targets)
         detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
 
-        losses = {}
-        losses.update(detector_losses)
-        losses.update(proposal_losses)
+
+        # losses = {}
+        # losses.update(detector_losses)
+        # losses.update(proposal_losses)
 
         if torch.jit.is_scripting():
             if not self._has_warned:
                 warnings.warn("RCNN always returns a (Losses, Detections) tuple in scripting")
                 self._has_warned = True
-            return (losses, detections)
+            return detections
         else:
-            return self.eager_outputs(losses, detections)
+            return detections
