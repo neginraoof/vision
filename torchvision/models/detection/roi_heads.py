@@ -522,9 +522,9 @@ class RoIHeads(torch.nn.Module):
             batch_size_per_image,
             positive_fraction)
 
-        if bbox_reg_weights is None:
-            bbox_reg_weights = (10., 10., 5., 5.)
-        self.box_coder = det_utils.BoxCoder(bbox_reg_weights)
+        # if bbox_reg_weights is None:
+        #     bbox_reg_weights = (10., 10., 5., 5.)
+        self.box_coder = det_utils.BoxCoder(10., 10., 5., 5.)
 
         self.box_roi_pool = box_roi_pool
         self.box_head = box_head

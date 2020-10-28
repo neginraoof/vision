@@ -70,7 +70,7 @@ class AnchorGenerator(nn.Module):
         return base_anchors.round()
 
     def set_cell_anchors(self, dtype, device):
-        # type: (int, Device) -> None  # noqa: F821
+        # type: (int, Device) -> Optional[List[torch.Tensor]]  # noqa: F821
         if self.cell_anchors is not None:
             cell_anchors = self.cell_anchors
             assert cell_anchors is not None
@@ -88,17 +88,17 @@ class AnchorGenerator(nn.Module):
             )
             for sizes, aspect_ratios in zip(self.sizes, self.aspect_ratios)
         ]
-        self.cell_anchors = cell_anchors
+        return cell_anchors
 
     def num_anchors_per_location(self):
         return [len(s) * len(a) for s, a in zip(self.sizes, self.aspect_ratios)]
 
     # For every combination of (a, (g, s), i) in (self.cell_anchors, zip(grid_sizes, strides), 0:2),
     # output g[i] anchors that are s[i] distance apart in direction i, with the same dimensions as a.
-    def grid_anchors(self, grid_sizes, strides):
-        # type: (List[List[int]], List[List[Tensor]]) -> List[Tensor]
+    def grid_anchors(self, grid_sizes, strides, cell_anchors):
+        # type: (List[List[int]], List[List[Tensor]], Optional[List[torch.Tensor]]) -> List[Tensor]
         anchors = []
-        cell_anchors = self.cell_anchors
+        # cell_anchors = self.cell_anchors
         assert cell_anchors is not None
         assert len(grid_sizes) == len(strides) == len(cell_anchors)
 
@@ -129,13 +129,13 @@ class AnchorGenerator(nn.Module):
 
         return anchors
 
-    def cached_grid_anchors(self, grid_sizes, strides):
-        # type: (List[List[int]], List[List[Tensor]]) -> List[Tensor]
+    def cached_grid_anchors(self, grid_sizes, strides, cell_anchors):
+        # type: (List[List[int]], List[List[Tensor]], Optional[List[torch.Tensor]]) -> List[Tensor]
         key = str(grid_sizes) + str(strides)
-        if key in self._cache:
-            return self._cache[key]
-        anchors = self.grid_anchors(grid_sizes, strides)
-        self._cache[key] = anchors
+        # if key in self._cache:
+        #     return self._cache[key]
+        anchors = self.grid_anchors(grid_sizes, strides, cell_anchors)
+        # self._cache[key] = anchors
         return anchors
 
     def forward(self, image_list, feature_maps):
@@ -145,8 +145,8 @@ class AnchorGenerator(nn.Module):
         dtype, device = feature_maps[0].dtype, feature_maps[0].device
         strides = [[torch.tensor(image_size[0] // g[0], dtype=torch.int64, device=device),
                     torch.tensor(image_size[1] // g[1], dtype=torch.int64, device=device)] for g in grid_sizes]
-        self.set_cell_anchors(dtype, device)
-        anchors_over_all_feature_maps = self.cached_grid_anchors(grid_sizes, strides)
+        cell_anchors = self.set_cell_anchors(dtype, device)
+        anchors_over_all_feature_maps = self.cached_grid_anchors(grid_sizes, strides, cell_anchors)
         anchors = torch.jit.annotate(List[List[torch.Tensor]], [])
         for i, (image_height, image_width) in enumerate(image_list.image_sizes):
             anchors_in_image = []
@@ -155,5 +155,5 @@ class AnchorGenerator(nn.Module):
             anchors.append(anchors_in_image)
         anchors = [torch.cat(anchors_per_image) for anchors_per_image in anchors]
         # Clear the cache in case that memory leaks.
-        self._cache.clear()
+        # self._cache.clear()
         return anchors

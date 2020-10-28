@@ -128,15 +128,26 @@ class BoxCoder(object):
     This class encodes and decodes a set of bounding boxes into
     the representation used for training the regressors.
     """
+    __annotations__ = {
+        'wx': float,
+        'wy': float,
+        'ww': float,
+        'wh': float,
+        'bbox_xform_clip': float,
+    }
 
-    def __init__(self, weights, bbox_xform_clip=math.log(1000. / 16)):
-        # type: (Tuple[float, float, float, float], float) -> None
+    def __init__(self, wx, wy, ww, wh, bbox_xform_clip=math.log(1000. / 16)):
+        # type: (float, float, float, float, float) -> None
         """
         Arguments:
             weights (4-element tuple)
             bbox_xform_clip (float)
         """
-        self.weights = weights
+        # self.weights = weights
+        self.wx = wx,
+        self.wy = wy,
+        self.ww = ww,
+        self.wh = wh,
         self.bbox_xform_clip = bbox_xform_clip
 
     def encode(self, reference_boxes, proposals):
@@ -158,7 +169,7 @@ class BoxCoder(object):
         """
         dtype = reference_boxes.dtype
         device = reference_boxes.device
-        weights = torch.as_tensor(self.weights, dtype=dtype, device=device)
+        weights = torch.as_tensor([self.wx, self.wy, self.ww, self.wh], dtype=dtype, device=device)
         targets = encode_boxes(reference_boxes, proposals, weights)
 
         return targets
@@ -194,11 +205,10 @@ class BoxCoder(object):
         ctr_x = boxes[:, 0] + 0.5 * widths
         ctr_y = boxes[:, 1] + 0.5 * heights
 
-        wx, wy, ww, wh = self.weights
-        dx = rel_codes[:, 0::4] / wx
-        dy = rel_codes[:, 1::4] / wy
-        dw = rel_codes[:, 2::4] / ww
-        dh = rel_codes[:, 3::4] / wh
+        dx = rel_codes[:, 0::4]
+        dy = rel_codes[:, 1::4]
+        dw = rel_codes[:, 2::4]
+        dh = rel_codes[:, 3::4]
 
         # Prevent sending too large values into torch.exp()
         dw = torch.clamp(dw, max=self.bbox_xform_clip)
