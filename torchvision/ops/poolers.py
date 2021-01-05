@@ -30,17 +30,6 @@ def _onnx_merge_levels(levels: Tensor, unmerged_results: List[Tensor]) -> Tensor
     return res
 
 
-# TODO: (eellison) T54974082 https://github.com/pytorch/pytorch/issues/26744/pytorch/issues/26744
-def initLevelMapper(
-    k_min: int,
-    k_max: int,
-    canonical_scale: int = 224,
-    canonical_level: int = 4,
-    eps: float = 1e-6,
-):
-    return LevelMapper(k_min, k_max, canonical_scale, canonical_level, eps)
-
-
 class LevelMapper(object):
     """Determine which FPN level each RoI in a set of RoIs should map to based
     on the heuristic in the FPN paper.
@@ -66,6 +55,15 @@ class LevelMapper(object):
         self.s0 = canonical_scale
         self.lvl0 = canonical_level
         self.eps = eps
+
+    @torch.jit.export
+    def __getstate__(self):
+        return (
+            self.k_min,
+            self.k_max,
+            self.s0,
+            self.lvl0,
+            self.eps)
 
     def __call__(self, boxlists: List[Tensor]) -> Tensor:
         """
@@ -173,7 +171,7 @@ class MultiScaleRoIAlign(nn.Module):
         lvl_min = -torch.log2(torch.tensor(scales[0], dtype=torch.float32)).item()
         lvl_max = -torch.log2(torch.tensor(scales[-1], dtype=torch.float32)).item()
         self.scales = scales
-        self.map_levels = initLevelMapper(int(lvl_min), int(lvl_max))
+        self.map_levels = LevelMapper(int(lvl_min), int(lvl_max))
 
     def forward(
         self,

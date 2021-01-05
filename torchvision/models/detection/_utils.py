@@ -140,6 +140,10 @@ class BoxCoder(object):
         self.weights = weights
         self.bbox_xform_clip = bbox_xform_clip
 
+    @torch.jit.export
+    def __getstate__(self):
+        return self.weights, self.bbox_xform_clip
+
     def encode(self, reference_boxes, proposals):
         # type: (List[Tensor], List[Tensor]) -> List[Tensor]
         boxes_per_image = [len(b) for b in reference_boxes]
